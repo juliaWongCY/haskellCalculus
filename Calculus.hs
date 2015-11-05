@@ -14,21 +14,91 @@ data Exp = Val Double | Id String | UnApp UnOp Exp | BinApp BinOp Exp Exp
 type Env = [(String, Double)]
 
 
-
+-- look up the associated variable
+-- Useful for using Id later
 lookUp :: Eq a => a -> [(a, b)] -> b
-lookUp = error "TODO implement lookUp"
+lookUp chr ((x, y) : xs)
+  | chr == x  = y
+  | otherwise = lookUp chr xs
+
+
 
 eval :: Exp -> Env -> Double
-eval = error "TODO: implement eval"
+eval (Val ex) list            = ex
+eval (Id ex) list             = lookUp ex list
+eval (UnApp Neg ex) list      = -(eval ex list)
+eval (UnApp Sin ex) list      = sin (eval ex list) 
+eval (UnApp Cos ex) list      = cos (eval ex list)
+eval (UnApp Log ex) list      = log (eval ex list)
+eval (BinApp Add ex ex') list = (eval ex list) + (eval ex' list) 
+eval (BinApp Mul ex ex') list = (eval ex list) * (eval ex' list)
+eval (BinApp Div ex ex') list = (eval ex list) / (eval ex' list)
 
+
+
+-- the list is the variable you want to differentiate with respect with
 diff :: Exp -> String -> Exp
-diff = error "TODO: implement diff"
+diff (Val _) _ 
+  = 0
+diff (Id x) var
+  | var == x  = 1
+  | otherwise = 0
+diff (BinApp Add ex ex') var 
+  = (diff ex var) + (diff ex' var)
+diff (BinApp Mul ex ex') var 
+  = (ex * (diff ex' var)) + ((diff ex var) * ex')
+diff (BinApp Div ex ex') var 
+  = (((diff ex var) * ex') - ((diff ex' var) * ex)) / (ex' ^ 2)
+diff (UnApp Neg ex) var 
+  = UnApp Neg (diff ex var)
+diff (UnApp Sin ex) var 
+  = (cos ex) * diff ex var 
+diff (UnApp Cos ex) var 
+  = UnApp Neg ((sin ex) * diff ex var)
+diff (UnApp Log ex) var 
+  = (diff ex var) / ex
 
+
+
+-- f = factorial 
+-- d = differential 
+-- d'= sub. x=0 into the differential
+-- p = the power of the variable
 maclaurin :: Exp -> Double -> Int -> Double
-maclaurin = error "TODO: implement maclaurin"
+maclaurin func pt term 
+  = sum (zipWith3 (\d' p f -> d' * p / f) d' p f)
+  where
+    d = iterate (flip diff "x") func
+    d'= map (flip eval [("x", 0)]) (take term d)
+    f = take term (scanl (*) 1 [1..])
+    p = take term ([pt^y | y <- [0..]])
 
+
+-- Generate a neat representation of the expressions
 showExp :: Exp -> String
-showExp = error "TODO: implement showExp"
+showExpp ex                
+  = ex
+showExp (Val ex)           
+  = show ex
+showExp (Id ex)            
+  = ex
+showExp (BinApp Add ex ex') 
+  = "(" ++ (showExp ex) ++ "+" ++ (showExp ex') ++ ")"
+showExp (BinApp Mul ex ex') 
+  = "(" ++ (showExp ex) ++ "*" ++ (showExp ex') ++ ")"
+showExp (BinApp Div ex ex') 
+  = "(" ++ (showExp ex) ++ "/" ++ (showExp ex') ++ ")"
+showExp (UnApp Neg ex)    
+  = "-" ++ "(" ++ (showExp ex) ++ ")"
+showExp (UnApp Log ex)    
+  = "log" ++ "(" ++ showExp ex ++ ")"
+showExp (UnApp Sin ex)    
+  = "sin" ++ "(" ++ showExp ex ++ ")"
+showExp (UnApp Cos ex)    
+  = "cos" ++ "(" ++ showExp ex ++ ")"
+
+
+ 
 
 ---------------------------------------------------------------------------
 -- Test cases from the spec.
@@ -62,13 +132,24 @@ e6 = UnApp Log (BinApp Add (BinApp Mul (Val 3.0) (BinApp Mul (Id "x") (Id "x")))
 ----------------------------------------------------------------------
 -- EXTENSION: Uncomment and complete these...
 
--- instance Num Exp where
+instance Num Exp where
+  (+) = BinApp Add
+  (*) = BinApp Mul
+  negate = UnApp Neg
+  fromInteger = Val . fromInteger
+  abs x = error "abs not implement"
+  signum x = error "signum not implement"
+  
+ 
+  
+instance Fractional Exp where
+  (/) = BinApp Div
 
--- instance Fractional Exp where
-
--- instance Floating Exp where
-
-
+instance Floating Exp where
+  sin = UnApp Sin 
+  cos = UnApp Cos
+  log = UnApp Log
+  
 -- instance (Eq a, Num a) => Num (Maybe a) where
 
 -- instance (Eq a, Fractional a) => Fractional (Maybe a) where
